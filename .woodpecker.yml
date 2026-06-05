@@ -1,0 +1,72 @@
+when:
+  branch: [master, main]
+  event: [push]
+
+steps:
+  - name: test
+    image: golang:1.25-alpine
+    commands:
+      - go test ./...
+
+  - name: build
+    image: golang:1.25-alpine
+    commands:
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o jacques-bin .
+
+  - name: deploy
+    image: alpine:latest
+    environment:
+      VPS_SSH_KEY:
+        from_secret: VPS_SSH_KEY
+      VPS_IP_ADDRESS:
+        from_secret: VPS_IP_ADDRESS
+      JACQUES_TOKEN:
+        from_secret: JACQUES_TOKEN
+      JACQUES_BASE_URL:
+        from_secret: JACQUES_BASE_URL
+    commands:
+      - apk add --no-cache openssh rsync
+      - mkdir -p ~/.ssh
+      - printf "%s\n" "$VPS_SSH_KEY" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - ssh-keyscan -H $VPS_IP_ADDRESS >> ~/.ssh/known_hosts 2>&1
+      - |
+        printf "JACQUES_SERVER=https://raccoonisland.social\nJACQUES_TOKEN=%s\nJACQUES_BASE_URL=%s\nJACQUES_DB=/data/jacques.db\nJACQUES_LISTEN=:8080\n" "$JACQUES_TOKEN" "$JACQUES_BASE_URL" > jacques.env
+      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'mkdir -p /root/npm/data/jacques'
+      - rsync -avz -e "ssh -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no" jacques-bin jacques.env root@"$VPS_IP_ADDRESS":/root/npm/data/jacques/
+      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'chmod 600 /root/npm/data/jacques/jacques.env && chmod 755 /root/npm/data/jacques/jacques-bin'
+      - |
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS '
+          docker stop jacques || true
+          docker rm jacques || true
+          docker run -d --restart unless-stopped --name jacques \
+            --network npm_network \
+            -v /root/npm/data/jacques:/data \
+            --env-file /root/npm/data/jacques/jacques.env \
+            alpine:latest /data/jacques-bin
+        '
+      - rm -f ~/.ssh/id_rsa
+
+  - name: publish-version
+    image: alpine:latest
+    environment:
+      JACQUES_TOKEN:
+        from_secret: JACQUES_TOKEN
+    commands:
+      - apk add --no-cache curl jq
+      - VERSION=$(jq -r .version version.json)
+      - |
+        CURRENT=$(curl -sS -H "Authorization: Bearer $JACQUES_TOKEN" \
+          https://raccoonisland.social/api/v1/accounts/verify_credentials \
+          | jq -r '.source.fields[]? | select(.name == "Version") | .value')
+      - |
+        if [ "$CURRENT" = "$VERSION" ]; then
+          echo "profile already at v$VERSION"
+        else
+          echo "updating profile: v${CURRENT:-none} -> v$VERSION"
+          curl -sS -o /dev/null -w "%{http_code}\n" -X PATCH \
+            https://raccoonisland.social/api/v1/accounts/update_credentials \
+            -H "Authorization: Bearer $JACQUES_TOKEN" \
+            --data-urlencode "fields_attributes[0][name]=Version" \
+            --data-urlencode "fields_attributes[0][value]=$VERSION"
+        fi

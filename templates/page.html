@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Author.DisplayName}} — thread, unrolled</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/static/jacques.png">
+<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+<style>
+.invisible { display: none }
+.ellipsis::after { content: "…" }
+</style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 antialiased">
+<main class="mx-auto max-w-2xl px-4 py-12">
+
+<header class="flex items-center gap-4">
+<img src="{{.Author.Avatar}}" alt="" class="h-14 w-14 rounded-full bg-zinc-200">
+<div>
+<h1 class="text-xl font-semibold leading-tight">{{.Author.DisplayName}}</h1>
+<a href="{{.Author.URL}}" class="text-sm text-zinc-500 hover:underline">@{{.Author.Acct}}</a>
+</div>
+</header>
+
+<p class="mt-4 mb-10 border-b border-zinc-200 pb-6 text-sm text-zinc-500">
+{{.PostCount}} posts · {{date .StartedAt}} ·
+<a href="{{.RootURL}}" class="underline hover:text-zinc-700">view original thread</a>
+</p>
+
+<article class="prose prose-zinc max-w-none">
+{{range .Posts}}
+<section>
+{{safe .HTML}}
+{{if .Media}}
+<div class="not-prose my-4 grid gap-3">
+{{range .Media}}
+<img src="{{.URL}}" alt="{{.Description}}" loading="lazy" class="rounded-xl border border-zinc-200">
+{{end}}
+</div>
+{{end}}
+<footer class="not-prose mb-8 mt-2">
+<a href="{{.URL}}" class="text-xs text-zinc-400 hover:text-zinc-600">{{datetime .CreatedAt}}</a>
+</footer>
+</section>
+{{end}}
+</article>
+
+<footer class="mt-12 border-t border-zinc-200 pt-6">
+<a href="https://raccoonisland.social/@jacques" class="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-600">
+<span>unrolled by jacques</span>
+<img src="/static/jacques.png" alt="jacques" class="h-6 w-6 rounded-full">
+</a>
+</footer>
+
+</main>
+</body>
+</html>
