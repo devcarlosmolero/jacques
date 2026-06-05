@@ -6,6 +6,8 @@ Jacques, yes, *that* Jacques, the raccoon from Adventure Island, has hung up his
 
 He's a multipurpose bot written in Go. He starts small, but he's a fast learner, and new commands will keep arriving as development advances. His current version is always listed on [his profile](https://raccoonisland.social/@jacques).
 
+<a href="https://codeberg.org/devcarlosmolero/jacques" target="_blank" noopener noreferrer><img width="200px" src="https://codeberg.org/devcarlosmolero/jacques/raw/branch/master/mirror.svg"></a>
+
 ## What jacques can do today
 
 ### unroll
