@@ -150,8 +150,6 @@ func hasUnrollCommand(content string) bool {
 	return false
 }
 
-// hasPhrase reports whether the given words appear consecutively in the
-// status content, ignoring case, punctuation and HTML markup.
 func hasPhrase(content string, words ...string) bool {
 	text := html.UnescapeString(tagRe.ReplaceAllString(content, " "))
 	var fields []string
@@ -187,10 +185,20 @@ func (b *Bot) unroll(ctx context.Context, mention *Status) error {
 	}
 	root := mentionCtx.Ancestors[0]
 
+	if root.Account.ID != mention.Account.ID {
+		optedOut, err := b.store.IsOptedOut(root.Account.ID)
+		if err != nil {
+			return err
+		}
+		if optedOut || hasNoBot(root.Account.Note) {
+			return b.replyf(ctx, mention, "@%s the author of this thread prefers not to have their threads unrolled, so I'll leave it be.", mention.Account.Acct)
+		}
+	}
+
 	if existing, err := b.store.GetUnroll(root.ID); err != nil {
 		return err
 	} else if existing != nil {
-		return b.replyf(ctx, mention, "@%s this thread is already unrolled (%d posts): %s",
+		return b.replyPublicf(ctx, mention, "@%s this thread is already unrolled (%d posts): %s",
 			mention.Account.Acct, existing.PostCount, b.pageURL(root.ID))
 	}
 
@@ -204,7 +212,7 @@ func (b *Bot) unroll(ctx context.Context, mention *Status) error {
 	if err := b.store.SaveUnroll(page, mention.Account.Acct); err != nil {
 		return err
 	}
-	return b.replyf(ctx, mention, "@%s here you go, %d posts by @%s unrolled: %s",
+	return b.replyPublicf(ctx, mention, "@%s here you go, %d posts by @%s unrolled: %s",
 		mention.Account.Acct, len(chain), root.Account.Acct, b.pageURL(root.ID))
 }
 
@@ -263,9 +271,10 @@ func (b *Bot) pageURL(rootID string) string {
 	return b.baseURL + "/t/" + rootID
 }
 
-// replyf answers with a private mention: whatever jacques has to say to a
-// requester stays between the two of them. Only automatic announcements
-// (see announce) are public.
 func (b *Bot) replyf(ctx context.Context, to *Status, format string, args ...any) error {
 	return b.client.Reply(ctx, to, "direct", fmt.Sprintf(format, args...))
+}
+
+func (b *Bot) replyPublicf(ctx context.Context, to *Status, format string, args ...any) error {
+	return b.client.Reply(ctx, to, "public", fmt.Sprintf(format, args...))
 }

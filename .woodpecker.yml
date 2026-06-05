@@ -35,16 +35,7 @@ steps:
       - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'mkdir -p /root/npm/data/jacques'
       - rsync -avz -e "ssh -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no" jacques-bin jacques.env root@"$VPS_IP_ADDRESS":/root/npm/data/jacques/
       - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'chmod 600 /root/npm/data/jacques/jacques.env && chmod 755 /root/npm/data/jacques/jacques-bin'
-      - |
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS '
-          docker stop jacques || true
-          docker rm jacques || true
-          docker run -d --restart unless-stopped --name jacques \
-            --network npm_network \
-            -v /root/npm/data/jacques:/data \
-            --env-file /root/npm/data/jacques/jacques.env \
-            alpine:latest /data/jacques-bin
-        '
+      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'docker stop jacques || true; docker rm jacques || true; docker run -d --restart unless-stopped --name jacques --network npm_network -v /root/npm/data/jacques:/data --env-file /root/npm/data/jacques/jacques.env alpine:latest /data/jacques-bin'
       - rm -f ~/.ssh/id_rsa
 
   - name: publish-version

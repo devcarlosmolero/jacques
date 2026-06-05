@@ -81,7 +81,6 @@ func TestAutoThreadLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Not due yet: the last post is too recent.
 	due, err := store.DueAutoThreads(5, now)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +89,6 @@ func TestAutoThreadLifecycle(t *testing.T) {
 		t.Fatalf("expected no due threads, got %+v", due)
 	}
 
-	// Due once the quiet window has passed.
 	due, err = store.DueAutoThreads(5, now.Add(30*time.Minute))
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +97,6 @@ func TestAutoThreadLifecycle(t *testing.T) {
 		t.Fatalf("expected root due with 6 posts, got %+v", due)
 	}
 
-	// Announced threads never come back, even if the thread keeps growing.
 	if err := store.MarkAnnounced("root", now.Add(31*time.Minute)); err != nil {
 		t.Fatal(err)
 	}

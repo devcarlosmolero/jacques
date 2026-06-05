@@ -115,11 +115,6 @@ func (s *Store) SaveThreadPost(statusID, rootID string, depth int) error {
 	return err
 }
 
-// Prune drops observation data older than the cutoff so the tables don't
-// grow without bound. Announced threads are safe to drop too: the unroll
-// page saved in the unrolls table is what prevents a second announcement.
-// If a pruned thread comes back to life, observe rebuilds its state from a
-// single context fetch.
 func (s *Store) Prune(cutoff time.Time) error {
 	c := cutoff.UTC().Format(time.RFC3339)
 	if _, err := s.db.Exec(`DELETE FROM thread_posts WHERE seen_at < ?`, c); err != nil {
@@ -191,8 +186,6 @@ func (s *Store) IsOptedOut(accountID string) (bool, error) {
 	return n > 0, err
 }
 
-// ForgetPendingThreads drops every tracked-but-unannounced thread by an
-// author, so opting out also erases what jacques had gathered about them.
 func (s *Store) ForgetPendingThreads(authorAcct string) error {
 	_, err := s.db.Exec(`DELETE FROM auto_threads WHERE author_acct = ? AND announced_at = ''`, authorAcct)
 	return err
