@@ -38,7 +38,7 @@ steps:
       - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'docker stop jacques || true; docker rm jacques || true; docker run -d --restart unless-stopped --name jacques --network npm_network -v /root/npm/data/jacques:/data --env-file /root/npm/data/jacques/jacques.env alpine:latest /data/jacques-bin'
       - rm -f ~/.ssh/id_rsa
 
-  - name: publish-version
+  - name: publish-profile
     image: alpine:latest
     environment:
       JACQUES_TOKEN:
@@ -46,18 +46,27 @@ steps:
     commands:
       - apk add --no-cache curl jq
       - VERSION=$(jq -r .version version.json)
+      - CREATED_BY="@iscarlosmolero@raccoonisland.social"
+      - SOURCE_URL="https://codeberg.org/devcarlosmolero/jacques"
       - |
-        CURRENT=$(curl -sS -H "Authorization: Bearer $JACQUES_TOKEN" \
+        FIELDS=$(curl -sS -H "Authorization: Bearer $JACQUES_TOKEN" \
           https://raccoonisland.social/api/v1/accounts/verify_credentials \
-          | jq -r '.source.fields[]? | select(.name == "Version") | .value')
+          | jq -c '.source.fields // []')
+      - CURRENT_VERSION=$(echo "$FIELDS" | jq -r '.[]? | select(.name == "Version") | .value')
+      - CURRENT_CREATOR=$(echo "$FIELDS" | jq -r '.[]? | select(.name == "Created by") | .value')
+      - CURRENT_SOURCE=$(echo "$FIELDS" | jq -r '.[]? | select(.name == "Source code & Commands") | .value')
       - |
-        if [ "$CURRENT" = "$VERSION" ]; then
-          echo "profile already at v$VERSION"
+        if [ "$CURRENT_VERSION" = "$VERSION" ] && [ "$CURRENT_CREATOR" = "$CREATED_BY" ] && [ "$CURRENT_SOURCE" = "$SOURCE_URL" ]; then
+          echo "profile already up to date (v$VERSION)"
         else
-          echo "updating profile: v${CURRENT:-none} -> v$VERSION"
+          echo "updating profile: v${CURRENT_VERSION:-none} -> v$VERSION"
           curl -sS -o /dev/null -w "%{http_code}\n" -X PATCH \
             https://raccoonisland.social/api/v1/accounts/update_credentials \
             -H "Authorization: Bearer $JACQUES_TOKEN" \
             --data-urlencode "fields_attributes[0][name]=Version" \
-            --data-urlencode "fields_attributes[0][value]=$VERSION"
+            --data-urlencode "fields_attributes[0][value]=$VERSION" \
+            --data-urlencode "fields_attributes[1][name]=Created by" \
+            --data-urlencode "fields_attributes[1][value]=$CREATED_BY" \
+            --data-urlencode "fields_attributes[2][name]=Source code & Commands" \
+            --data-urlencode "fields_attributes[2][value]=$SOURCE_URL"
         fi
