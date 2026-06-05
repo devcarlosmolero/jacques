@@ -32,6 +32,8 @@ type Account struct {
 	DisplayName string `json:"display_name"`
 	Avatar      string `json:"avatar"`
 	URL         string `json:"url"`
+	Bot         bool   `json:"bot"`
+	Note        string `json:"note"`
 }
 
 type MediaAttachment struct {
@@ -41,14 +43,15 @@ type MediaAttachment struct {
 }
 
 type Status struct {
-	ID               string            `json:"id"`
-	CreatedAt        time.Time         `json:"created_at"`
-	InReplyToID      *string           `json:"in_reply_to_id"`
-	Content          string            `json:"content"`
-	Visibility       string            `json:"visibility"`
-	URL              string            `json:"url"`
-	Account          Account           `json:"account"`
-	MediaAttachments []MediaAttachment `json:"media_attachments"`
+	ID                 string            `json:"id"`
+	CreatedAt          time.Time         `json:"created_at"`
+	InReplyToID        *string           `json:"in_reply_to_id"`
+	InReplyToAccountID *string           `json:"in_reply_to_account_id"`
+	Content            string            `json:"content"`
+	Visibility         string            `json:"visibility"`
+	URL                string            `json:"url"`
+	Account            Account           `json:"account"`
+	MediaAttachments   []MediaAttachment `json:"media_attachments"`
 }
 
 type Notification struct {
@@ -110,6 +113,22 @@ func (c *Client) Mentions(ctx context.Context, sinceID string) ([]Notification, 
 	return ns, err
 }
 
+func (c *Client) TimelinePublic(ctx context.Context, sinceID string) ([]Status, error) {
+	q := url.Values{"limit": {"40"}}
+	if sinceID != "" {
+		q.Set("since_id", sinceID)
+	}
+	var ss []Status
+	err := c.do(ctx, http.MethodGet, "/api/v1/timelines/public", q, nil, &ss)
+	return ss, err
+}
+
+func (c *Client) GetStatus(ctx context.Context, statusID string) (Status, error) {
+	var s Status
+	err := c.do(ctx, http.MethodGet, "/api/v1/statuses/"+statusID, nil, nil, &s)
+	return s, err
+}
+
 func (c *Client) Context(ctx context.Context, statusID string) (StatusContext, error) {
 	var sc StatusContext
 	err := c.do(ctx, http.MethodGet, "/api/v1/statuses/"+statusID+"/context", nil, nil, &sc)
@@ -120,11 +139,7 @@ func (c *Client) Reblog(ctx context.Context, statusID string) error {
 	return c.do(ctx, http.MethodPost, "/api/v1/statuses/"+statusID+"/reblog", nil, nil, nil)
 }
 
-func (c *Client) Reply(ctx context.Context, to *Status, text string) error {
-	visibility := to.Visibility
-	if visibility == "public" {
-		visibility = "unlisted"
-	}
+func (c *Client) Reply(ctx context.Context, to *Status, visibility, text string) error {
 	form := url.Values{
 		"status":         {text},
 		"in_reply_to_id": {to.ID},

@@ -10,13 +10,19 @@ He's a multipurpose bot written in Go. He starts small, but he's a fast learner,
 
 ### unroll
 
-Reply `@jacques unroll` to any post inside a thread and jacques answers with a link to the whole thread laid out as a single page. No tapping through reply after reply, no losing your place halfway down: just the author's posts in order, with their links, mentions, hashtags and images, typeset for comfortable reading from top to bottom.
+Reply `@jacques unroll` to any post inside a thread and jacques answers, in a private mention, with a link to the whole thread laid out as a single page. No tapping through reply after reply, no losing your place halfway down: just the author's posts in order, with their links, mentions, hashtags and images, typeset for comfortable reading from top to bottom.
 
 Threads are only ever unrolled once. If someone already asked for that thread, jacques hands you the existing link straight away.
 
 ### boost
 
 Mention `@jacques` in any public or unlisted post, no command needed, and he'll boost it. A little raccoon megaphone for things you want amplified.
+
+### auto-unroll
+
+Jacques also rummages on his own. He watches the federated timeline for authors replying to themselves, and when a self-thread reaches 5 posts and has been quiet for 15 minutes, he unrolls it and replies with the link. These announcements are the only thing jacques says in public; everything else is a private mention. One reply per thread, ever; at most 4 per hour; bots and conversations that merely contain self-replies are left alone.
+
+Don't want him around? Put `#nobot` in your bio, or send him a private mention saying `forget me` and he'll drop what he'd gathered about your threads and never unroll you on his own again (`remember me` undoes it). Everything is tunable or can be switched off via the `JACQUES_AUTO_UNROLL*` environment variables in `main.go`.
 
 ## How he does it
 

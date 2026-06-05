@@ -6,12 +6,24 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+		log.Fatalf("%s must be an integer, got %q", key, v)
 	}
 	return fallback
 }
@@ -49,8 +61,16 @@ func main() {
 	}
 	defer store.Close()
 
+	auto := AutoConfig{
+		Enabled:   envOr("JACQUES_AUTO_UNROLL", "on") != "off",
+		MinPosts:  envInt("JACQUES_AUTO_UNROLL_MIN_POSTS", 5),
+		Quiet:     time.Duration(envInt("JACQUES_AUTO_UNROLL_QUIET_MINUTES", 15)) * time.Minute,
+		HourlyCap: envInt("JACQUES_AUTO_UNROLL_HOURLY_CAP", 4),
+		Retention: time.Duration(envInt("JACQUES_AUTO_UNROLL_RETENTION_DAYS", 7)) * 24 * time.Hour,
+	}
+
 	log.Printf("jacques v%s", botVersion())
-	bot := NewBot(NewClient(server, token), store, strings.TrimRight(baseURL, "/"))
+	bot := NewBot(NewClient(server, token), store, strings.TrimRight(baseURL, "/"), auto)
 	go func() {
 		if err := bot.Run(context.Background()); err != nil {
 			log.Fatalf("bot stopped: %v", err)

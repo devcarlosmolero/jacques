@@ -13,19 +13,22 @@ import (
 )
 
 type Bot struct {
-	client  *Client
-	store   *Store
-	baseURL string
-	policy  *bluemonday.Policy
-	me      Account
+	client    *Client
+	store     *Store
+	baseURL   string
+	policy    *bluemonday.Policy
+	auto      AutoConfig
+	me        Account
+	lastPrune time.Time
 }
 
-func NewBot(client *Client, store *Store, baseURL string) *Bot {
+func NewBot(client *Client, store *Store, baseURL string, auto AutoConfig) *Bot {
 	return &Bot{
 		client:  client,
 		store:   store,
 		baseURL: baseURL,
 		policy:  newPolicy(),
+		auto:    auto,
 	}
 }
 
@@ -74,6 +77,17 @@ func (b *Bot) Run(ctx context.Context) error {
 				log.Printf("saving notification cursor: %v", err)
 			}
 		}
+
+		if b.auto.Enabled {
+			b.pollTimeline(ctx)
+			b.announceDue(ctx)
+			if time.Since(b.lastPrune) > time.Hour {
+				if err := b.store.Prune(time.Now().Add(-b.auto.Retention)); err != nil {
+					log.Printf("pruning observation data: %v", err)
+				}
+				b.lastPrune = time.Now()
+			}
+		}
 	}
 }
 
@@ -83,6 +97,30 @@ func (b *Bot) handle(ctx context.Context, n Notification) {
 	}
 	if n.Status.Account.ID == b.me.ID {
 		return
+	}
+	if n.Status.Visibility == "direct" {
+		from := n.Status.Account
+		if hasPhrase(n.Status.Content, "forget", "me") {
+			log.Printf("opt-out requested by @%s", from.Acct)
+			if err := b.store.OptOut(from.ID, from.Acct); err != nil {
+				log.Printf("saving opt-out: %v", err)
+				return
+			}
+			if err := b.store.ForgetPendingThreads(from.Acct); err != nil {
+				log.Printf("forgetting pending threads: %v", err)
+			}
+			b.replyf(ctx, n.Status, "@%s done. I've dropped what I'd gathered about your threads and won't unroll you on my own again. Message me \"remember me\" if you change your mind.", from.Acct)
+			return
+		}
+		if hasPhrase(n.Status.Content, "remember", "me") {
+			log.Printf("opt-in requested by @%s", from.Acct)
+			if err := b.store.OptIn(from.ID); err != nil {
+				log.Printf("removing opt-out: %v", err)
+				return
+			}
+			b.replyf(ctx, n.Status, "@%s welcome back! I'll happily unroll your threads again.", from.Acct)
+			return
+		}
 	}
 	if !hasUnrollCommand(n.Status.Content) {
 		if n.Status.Visibility == "public" || n.Status.Visibility == "unlisted" {
@@ -106,6 +144,29 @@ func hasUnrollCommand(content string) bool {
 	text := html.UnescapeString(tagRe.ReplaceAllString(content, " "))
 	for _, field := range strings.Fields(text) {
 		if strings.EqualFold(strings.Trim(field, ".,!?:;"), "unroll") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPhrase reports whether the given words appear consecutively in the
+// status content, ignoring case, punctuation and HTML markup.
+func hasPhrase(content string, words ...string) bool {
+	text := html.UnescapeString(tagRe.ReplaceAllString(content, " "))
+	var fields []string
+	for _, f := range strings.Fields(text) {
+		fields = append(fields, strings.ToLower(strings.Trim(f, `.,!?:;"'`)))
+	}
+	for i := 0; i+len(words) <= len(fields); i++ {
+		match := true
+		for j, w := range words {
+			if fields[i+j] != w {
+				match = false
+				break
+			}
+		}
+		if match {
 			return true
 		}
 	}
@@ -202,6 +263,9 @@ func (b *Bot) pageURL(rootID string) string {
 	return b.baseURL + "/t/" + rootID
 }
 
+// replyf answers with a private mention: whatever jacques has to say to a
+// requester stays between the two of them. Only automatic announcements
+// (see announce) are public.
 func (b *Bot) replyf(ctx context.Context, to *Status, format string, args ...any) error {
-	return b.client.Reply(ctx, to, fmt.Sprintf(format, args...))
+	return b.client.Reply(ctx, to, "direct", fmt.Sprintf(format, args...))
 }

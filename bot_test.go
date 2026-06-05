@@ -50,6 +50,176 @@ func TestBuildChainPicksEarliestBranch(t *testing.T) {
 	}
 }
 
+func TestHasNoBot(t *testing.T) {
+	cases := map[string]bool{
+		`<p>I post about ferns. #nobot</p>`:                                                   true,
+		`<p>opt me out: <a href="https://example.com/tags/nobot">#<span>nobot</span></a></p>`: true,
+		`<p>I post about ferns. #NoBot</p>`:                                                   true,
+		`<p>I love robots and the nobot hashtag discourse</p>`:                                false,
+		`<p>just a regular bio with a <a href="#">link</a></p>`:                               false,
+		``: false,
+	}
+	for note, want := range cases {
+		if got := hasNoBot(note); got != want {
+			t.Errorf("hasNoBot(%q) = %v, want %v", note, got, want)
+		}
+	}
+}
+
+func TestAutoThreadLifecycle(t *testing.T) {
+	store, err := NewStore(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	now := time.Date(2026, 6, 6, 12, 0, 0, 0, time.UTC)
+	if err := store.TrackAutoThread("root", "alice", 3, "s3", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.TrackAutoThread("root", "alice", 6, "s6", now.Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Not due yet: the last post is too recent.
+	due, err := store.DueAutoThreads(5, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 0 {
+		t.Fatalf("expected no due threads, got %+v", due)
+	}
+
+	// Due once the quiet window has passed.
+	due, err = store.DueAutoThreads(5, now.Add(30*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 1 || due[0].RootID != "root" || due[0].PostCount != 6 {
+		t.Fatalf("expected root due with 6 posts, got %+v", due)
+	}
+
+	// Announced threads never come back, even if the thread keeps growing.
+	if err := store.MarkAnnounced("root", now.Add(31*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.TrackAutoThread("root", "alice", 8, "s8", now.Add(40*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	due, err = store.DueAutoThreads(5, now.Add(2*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 0 {
+		t.Fatalf("expected announced thread to stay announced, got %+v", due)
+	}
+
+	n, err := store.AnnouncedCountSince(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("AnnouncedCountSince = %d, want 1", n)
+	}
+}
+
+func TestHasPhrase(t *testing.T) {
+	cases := map[string]bool{
+		`<p><span class="h-card"><a href="https://example.com/@jacques">@jacques</a></span> forget me</p>`: true,
+		`<p>@jacques Forget me!</p>`:        true,
+		`<p>@jacques please forget me.</p>`: true,
+		`<p>@jacques forget about me</p>`:   false,
+		`<p>@jacques me forget</p>`:         false,
+		`<p>@jacques forget</p>`:            false,
+	}
+	for content, want := range cases {
+		if got := hasPhrase(content, "forget", "me"); got != want {
+			t.Errorf("hasPhrase(%q, forget me) = %v, want %v", content, got, want)
+		}
+	}
+}
+
+func TestOptOutLifecycle(t *testing.T) {
+	store, err := NewStore(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	now := time.Date(2026, 6, 6, 12, 0, 0, 0, time.UTC)
+	if err := store.TrackAutoThread("root", "alice@remote.tld", 6, "s6", now); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.OptOut("acc1", "alice@remote.tld"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ForgetPendingThreads("alice@remote.tld"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := store.IsOptedOut("acc1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !out {
+		t.Fatal("expected acc1 to be opted out")
+	}
+	due, err := store.DueAutoThreads(5, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 0 {
+		t.Fatalf("expected pending threads to be forgotten, got %+v", due)
+	}
+
+	if err := store.OptIn("acc1"); err != nil {
+		t.Fatal(err)
+	}
+	out, err = store.IsOptedOut("acc1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out {
+		t.Fatal("expected acc1 to be opted back in")
+	}
+}
+
+func TestPrune(t *testing.T) {
+	store, err := NewStore(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	old := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	fresh := time.Date(2026, 6, 6, 12, 0, 0, 0, time.UTC)
+	if err := store.TrackAutoThread("stale", "alice", 2, "s2", old); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.TrackAutoThread("alive", "bob", 6, "s6", fresh); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveThreadPost("s6", "alive", 5); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Prune(fresh.Add(-24 * time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	due, err := store.DueAutoThreads(1, fresh.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 1 || due[0].RootID != "alive" {
+		t.Fatalf("expected only the fresh thread to survive, got %+v", due)
+	}
+	if _, _, ok, err := store.GetThreadPost("s6"); err != nil || !ok {
+		t.Fatalf("expected fresh thread post to survive, ok=%v err=%v", ok, err)
+	}
+}
+
 func TestHasUnrollCommand(t *testing.T) {
 	cases := map[string]bool{
 		`<p><span class="h-card"><a href="https://example.com/@jacques">@jacques</a></span> unroll</p>`: true,
