@@ -8,7 +8,7 @@ import (
 
 func TestPageTemplateRendersSampleThread(t *testing.T) {
 	var buf bytes.Buffer
-	if err := pageTemplate.Execute(&buf, samplePage()); err != nil {
+	if err := pageTemplate.Execute(&buf, pageView{PageData: samplePage(), BaseURL: "https://jacques.example"}); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -16,6 +16,7 @@ func TestPageTemplateRendersSampleThread(t *testing.T) {
 		"Rocky Raccoon",
 		"@rocky",
 		"5 posts",
+		"min read",
 		`class="invisible"`,
 		`class="ellipsis"`,
 		"openwrt.org/docs/guide-user/inst",
@@ -25,9 +26,59 @@ func TestPageTemplateRendersSampleThread(t *testing.T) {
 		"<code>10.0.10.0/24</code>",
 		"picsum.photos/seed/rack-front",
 		"Front view of a small network rack",
+		`property="og:title"`,
+		`property="og:image" content="https://picsum.photos/seed/router-box/1200/800"`,
+		`property="og:url" content="https://jacques.example/t/preview"`,
+		`rel="canonical" href="https://jacques.example/t/preview"`,
+		`id="post-1"`,
+		`href="#post-5"`,
+		`href="https://jacques.example/t/preview.md"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered page is missing %q", want)
+		}
+	}
+}
+
+func TestPageMetadataHelpers(t *testing.T) {
+	page := samplePage()
+	if got := page.FirstImage(); got != "https://picsum.photos/seed/router-box/1200/800" {
+		t.Errorf("FirstImage = %q", got)
+	}
+	excerpt := page.Excerpt()
+	if !strings.HasPrefix(excerpt, "I spent the last month rebuilding my home network") {
+		t.Errorf("Excerpt = %q", excerpt)
+	}
+	if len([]rune(excerpt)) > 201 {
+		t.Errorf("Excerpt too long: %d runes", len([]rune(excerpt)))
+	}
+	if got := page.ReadingMinutes(); got < 1 || got > 3 {
+		t.Errorf("ReadingMinutes = %d, want a small positive number", got)
+	}
+}
+
+func TestRenderMarkdown(t *testing.T) {
+	out := renderMarkdown(samplePage())
+	for _, want := range []string{
+		"# Rocky Raccoon (@rocky) — thread, unrolled",
+		"5 posts",
+		"[view original thread](https://raccoonisland.social/@rocky/1)",
+		"**VLANs before hardware**",
+		"> Every untagged port is a future security incident",
+		"`10.0.10.0/24`",
+		"[openwrt.org/docs/guide-user/inst…](https://openwrt.org/docs/guide-user/installation/openwrt_x86)",
+		"[@trash_panda](https://raccoonisland.social/@trash_panda)",
+		"![A small fanless mini PC sitting on a wooden desk next to a patch cable](https://picsum.photos/seed/router-box/1200/800)",
+		"[1/5",
+		"unrolled by [jacques]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("markdown is missing %q", want)
+		}
+	}
+	for _, banned := range []string{"<p>", "</a>", "<span", "https://https://"} {
+		if strings.Contains(out, banned) {
+			t.Errorf("markdown still contains %q", banned)
 		}
 	}
 }

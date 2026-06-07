@@ -5,11 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Author.DisplayName}} — thread, unrolled</title>
 <meta name="robots" content="noindex">
+<meta name="description" content="{{.Excerpt}}">
+<link rel="canonical" href="{{.PageURL}}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="jacques">
+<meta property="og:title" content="{{.Author.DisplayName}} — thread, unrolled ({{.PostCount}} posts)">
+<meta property="og:description" content="{{.Excerpt}}">
+<meta property="og:url" content="{{.PageURL}}">
+<meta property="og:image" content="{{.FirstImage}}">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="/static/jacques.png">
 <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
 <style>
 .invisible { display: none }
 .ellipsis::after { content: "…" }
+section:target { scroll-margin-top: 1.5rem }
 </style>
 </head>
 <body class="bg-zinc-50 text-zinc-900 antialiased">
@@ -24,33 +34,35 @@
 </header>
 
 <p class="mt-4 mb-10 border-b border-zinc-200 pb-6 text-sm text-zinc-500">
-{{.PostCount}} posts · {{date .StartedAt}} ·
+{{.PostCount}} posts · ~{{.ReadingMinutes}} min read · {{date .StartedAt}} ·
 <a href="{{.RootURL}}" class="underline hover:text-zinc-700">view original thread</a>
 </p>
 
 <article class="prose prose-zinc max-w-none">
-{{range .Posts}}
-<section>
-{{safe .HTML}}
-{{if .Media}}
+{{range $i, $post := .Posts}}
+<section id="post-{{inc $i}}">
+{{safe $post.HTML}}
+{{if $post.Media}}
 <div class="not-prose my-4 grid gap-3">
-{{range .Media}}
+{{range $post.Media}}
 <img src="{{.URL}}" alt="{{.Description}}" loading="lazy" class="rounded-xl border border-zinc-200">
 {{end}}
 </div>
 {{end}}
 <footer class="not-prose mb-8 mt-2">
-<a href="{{.URL}}" class="text-xs text-zinc-400 hover:text-zinc-600">{{datetime .CreatedAt}}</a>
+<a href="{{$post.URL}}" class="text-xs text-zinc-400 hover:text-zinc-600">{{datetime $post.CreatedAt}}</a>
+<a href="#post-{{inc $i}}" class="ml-2 text-xs text-zinc-300 hover:text-zinc-500" title="link to this post">#{{inc $i}}</a>
 </footer>
 </section>
 {{end}}
 </article>
 
-<footer class="mt-12 border-t border-zinc-200 pt-6">
+<footer class="mt-12 flex items-center justify-between border-t border-zinc-200 pt-6">
 <a href="https://raccoonisland.social/@jacques" class="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-600">
 <span>unrolled by jacques</span>
 <img src="/static/jacques.png" alt="jacques" class="h-6 w-6 rounded-full">
 </a>
+<a href="{{.PageURL}}.md" class="text-xs text-zinc-400 hover:text-zinc-600">markdown</a>
 </footer>
 
 </main>

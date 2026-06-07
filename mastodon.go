@@ -139,6 +139,14 @@ func (c *Client) Reblog(ctx context.Context, statusID string) error {
 	return c.do(ctx, http.MethodPost, "/api/v1/statuses/"+statusID+"/reblog", nil, nil, nil)
 }
 
+func (c *Client) Post(ctx context.Context, visibility, text string) error {
+	form := url.Values{
+		"status":     {text},
+		"visibility": {visibility},
+	}
+	return c.do(ctx, http.MethodPost, "/api/v1/statuses", nil, form, nil)
+}
+
 func (c *Client) Reply(ctx context.Context, to *Status, visibility, text string) error {
 	form := url.Values{
 		"status":         {text},

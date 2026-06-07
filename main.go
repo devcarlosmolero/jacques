@@ -43,7 +43,7 @@ func main() {
 			log.Fatalf("seeding preview: %v", err)
 		}
 		log.Printf("preview thread at http://localhost%s/t/preview", listen)
-		log.Fatal(http.ListenAndServe(listen, NewWeb(store)))
+		log.Fatal(http.ListenAndServe(listen, NewWeb(store, "http://localhost"+listen)))
 	}
 
 	server := os.Getenv("JACQUES_SERVER")
@@ -69,8 +69,10 @@ func main() {
 		Retention: time.Duration(envInt("JACQUES_AUTO_UNROLL_RETENTION_DAYS", 7)) * 24 * time.Hour,
 	}
 
+	monthlyStats := envOr("JACQUES_MONTHLY_STATS", "on") != "off"
+
 	log.Printf("jacques v%s", botVersion())
-	bot := NewBot(NewClient(server, token), store, strings.TrimRight(baseURL, "/"), auto)
+	bot := NewBot(NewClient(server, token), store, strings.TrimRight(baseURL, "/"), auto, monthlyStats)
 	go func() {
 		if err := bot.Run(context.Background()); err != nil {
 			log.Fatalf("bot stopped: %v", err)
@@ -78,7 +80,7 @@ func main() {
 	}()
 
 	log.Printf("jacques serving pages on %s", listen)
-	if err := http.ListenAndServe(listen, NewWeb(store)); err != nil {
+	if err := http.ListenAndServe(listen, NewWeb(store, baseURL)); err != nil {
 		log.Fatal(err)
 	}
 }

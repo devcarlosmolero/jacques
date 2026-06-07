@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS optouts (
 	acct       TEXT NOT NULL,
 	created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS reminders (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	status_id  TEXT NOT NULL,
+	acct       TEXT NOT NULL,
+	visibility TEXT NOT NULL DEFAULT 'direct',
+	remind_at  TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS birthdays (
+	account_id TEXT PRIMARY KEY,
+	acct       TEXT NOT NULL,
+	month      INTEGER NOT NULL,
+	day        INTEGER NOT NULL,
+	created_at TEXT NOT NULL
+);
 `
 
 func NewStore(path string) (*Store, error) {
@@ -217,4 +232,92 @@ func (s *Store) SaveUnroll(page *PageData, requestedBy string) error {
 		ON CONFLICT(root_id) DO NOTHING`,
 		page.RootID, page.Author.Acct, requestedBy, page.PostCount, string(raw), time.Now().UTC().Format(time.RFC3339))
 	return err
+}
+
+func (s *Store) RefreshUnroll(page *PageData) error {
+	raw, err := json.Marshal(page)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`UPDATE unrolls SET post_count = ?, data = ? WHERE root_id = ?`,
+		page.PostCount, string(raw), page.RootID)
+	return err
+}
+
+func (s *Store) UnrollStats(from, until time.Time) (threads, posts int, err error) {
+	err = s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(post_count), 0) FROM unrolls
+		WHERE created_at >= ? AND created_at < ?`,
+		from.UTC().Format(time.RFC3339), until.UTC().Format(time.RFC3339)).Scan(&threads, &posts)
+	return threads, posts, err
+}
+
+func (s *Store) TotalUnrolls() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM unrolls`).Scan(&n)
+	return n, err
+}
+
+type Reminder struct {
+	ID         int64
+	StatusID   string
+	Acct       string
+	Visibility string
+}
+
+func (s *Store) AddReminder(statusID, acct, visibility string, at time.Time) error {
+	_, err := s.db.Exec(`INSERT INTO reminders (status_id, acct, visibility, remind_at, created_at) VALUES (?, ?, ?, ?, ?)`,
+		statusID, acct, visibility, at.UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) DueReminders(now time.Time) ([]Reminder, error) {
+	rows, err := s.db.Query(`SELECT id, status_id, acct, visibility FROM reminders WHERE remind_at <= ? ORDER BY remind_at`,
+		now.UTC().Format(time.RFC3339))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var due []Reminder
+	for rows.Next() {
+		var r Reminder
+		if err := rows.Scan(&r.ID, &r.StatusID, &r.Acct, &r.Visibility); err != nil {
+			return nil, err
+		}
+		due = append(due, r)
+	}
+	return due, rows.Err()
+}
+
+func (s *Store) DeleteReminder(id int64) error {
+	_, err := s.db.Exec(`DELETE FROM reminders WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) SetBirthday(accountID, acct string, month time.Month, day int) error {
+	_, err := s.db.Exec(`INSERT INTO birthdays (account_id, acct, month, day, created_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(account_id) DO UPDATE SET acct = excluded.acct, month = excluded.month, day = excluded.day`,
+		accountID, acct, int(month), day, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) RemoveBirthday(accountID string) error {
+	_, err := s.db.Exec(`DELETE FROM birthdays WHERE account_id = ?`, accountID)
+	return err
+}
+
+func (s *Store) BirthdaysOn(month time.Month, day int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT acct FROM birthdays WHERE month = ? AND day = ? ORDER BY acct`, int(month), day)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var accts []string
+	for rows.Next() {
+		var acct string
+		if err := rows.Scan(&acct); err != nil {
+			return nil, err
+		}
+		accts = append(accts, acct)
+	}
+	return accts, rows.Err()
 }
