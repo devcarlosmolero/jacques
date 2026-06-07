@@ -32,10 +32,9 @@ steps:
       - ssh-keyscan -H $VPS_IP_ADDRESS >> ~/.ssh/known_hosts 2>&1
       - |
         printf "JACQUES_SERVER=https://raccoonisland.social\nJACQUES_TOKEN=%s\nJACQUES_BASE_URL=%s\nJACQUES_DB=/data/jacques.db\nJACQUES_LISTEN=:8080\n" "$JACQUES_TOKEN" "$JACQUES_BASE_URL" > jacques.env
-      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'mkdir -p /root/npm/data/jacques'
-      - rsync -avz -e "ssh -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no" jacques-bin jacques.env root@"$VPS_IP_ADDRESS":/root/npm/data/jacques/
-      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'chmod 600 /root/npm/data/jacques/jacques.env && chmod 755 /root/npm/data/jacques/jacques-bin'
-      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS 'docker stop jacques || true; docker rm jacques || true; docker run -d --restart unless-stopped --name jacques --network npm_network -v /root/npm/data/jacques:/data --env-file /root/npm/data/jacques/jacques.env alpine:latest /data/jacques-bin'
+      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS mkdir -p /root/npm/data/jacques
+      - rsync -avz -e "ssh -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no" jacques-bin jacques.env deploy.sh root@"$VPS_IP_ADDRESS":/root/npm/data/jacques/
+      - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@$VPS_IP_ADDRESS sh /root/npm/data/jacques/deploy.sh
       - rm -f ~/.ssh/id_rsa
 
   - name: publish-profile
