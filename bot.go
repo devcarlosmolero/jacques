@@ -416,13 +416,13 @@ func (b *Bot) handle(ctx context.Context, n Notification) {
 		}
 	case "help":
 		err = b.replyf(ctx, n.Status, "@%s here's what I can do:\n\n"+
-			"unroll — reply this to any post in a thread and I'll lay it out on a single page\n"+
-			"refresh — thread authors can ask me to re-read their thread and update the page\n"+
-			"remind — \"remind me in 3 days\" (or hours, weeks, or \"tomorrow\") and I'll nudge you here\n"+
-			"version — tells you which version of me is running\n\n"+
-			"Mention me on any public post without a command and I'll boost it. "+
-			"Send me a private mention saying \"birthday June 12\" and I'll publicly wish you a happy birthday every year (\"birthday forget\" drops it). "+
-			"Send me a private mention saying \"forget me\" and I'll never unroll you on my own again (\"remember me\" undoes it).",
+			"unroll — reply this to any thread post and I'll lay it out on one page\n"+
+			"refresh — thread authors can ask me to update the page\n"+
+			"remind — \"remind me in 3 days\" (or hours, weeks, \"tomorrow\")\n"+
+			"version — which version of me is running\n\n"+
+			"Mention me without a command and I'll boost the post. "+
+			"Private mentions: \"birthday June 12\" for yearly wishes (\"birthday forget\" drops it), "+
+			"\"forget me\" / \"remember me\" to opt out/in of auto-unrolls.",
 			n.Status.Account.Acct)
 	case "version":
 		err = b.replyf(ctx, n.Status, "@%s I'm jacques v%s. 🦝", n.Status.Account.Acct, botVersion())
