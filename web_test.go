@@ -60,7 +60,7 @@ func TestPageMetadataHelpers(t *testing.T) {
 func TestRenderMarkdown(t *testing.T) {
 	out := renderMarkdown(samplePage())
 	for _, want := range []string{
-		"# Rocky Raccoon (@rocky) — thread, unrolled",
+		"# Rocky Raccoon (@rocky): thread, unrolled",
 		"5 posts",
 		"[view original thread](https://raccoonisland.social/@rocky/1)",
 		"**VLANs before hardware**",

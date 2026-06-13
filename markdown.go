@@ -11,7 +11,7 @@ import (
 
 func renderMarkdown(p *PageData) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s (@%s) — thread, unrolled\n\n", p.Author.DisplayName, p.Author.Acct)
+	fmt.Fprintf(&b, "# %s (@%s): thread, unrolled\n\n", p.Author.DisplayName, p.Author.Acct)
 	fmt.Fprintf(&b, "%d posts · %s · [view original thread](%s)\n\n", p.PostCount, p.StartedAt.Format("Jan 2, 2006"), p.RootURL)
 	for i, post := range p.Posts {
 		b.WriteString("---\n\n")

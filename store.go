@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS birthdays (
 	day        INTEGER NOT NULL,
 	created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS help_prompts (
+	status_id  TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL
+);
 `
 
 func NewStore(path string) (*Store, error) {
@@ -135,7 +139,27 @@ func (s *Store) Prune(cutoff time.Time) error {
 	if _, err := s.db.Exec(`DELETE FROM thread_posts WHERE seen_at < ?`, c); err != nil {
 		return err
 	}
+	if _, err := s.db.Exec(`DELETE FROM help_prompts WHERE created_at < ?`, c); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`DELETE FROM auto_threads WHERE last_post_at < ?`, c)
+	return err
+}
+
+func (s *Store) AddHelpPrompt(statusID string) error {
+	_, err := s.db.Exec(`INSERT INTO help_prompts (status_id, created_at) VALUES (?, ?)
+		ON CONFLICT(status_id) DO NOTHING`, statusID, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) IsHelpPrompt(statusID string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM help_prompts WHERE status_id = ?`, statusID).Scan(&n)
+	return n > 0, err
+}
+
+func (s *Store) DeleteHelpPrompt(statusID string) error {
+	_, err := s.db.Exec(`DELETE FROM help_prompts WHERE status_id = ?`, statusID)
 	return err
 }
 

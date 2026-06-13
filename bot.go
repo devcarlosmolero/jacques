@@ -118,7 +118,7 @@ func (b *Bot) birthday(ctx context.Context, mention *Status) error {
 		return err
 	}
 	log.Printf("birthday set by @%s: %s %d", from.Acct, month, day)
-	return b.replyf(ctx, mention, "@%s 🎂 noted! I'll wish you a happy birthday every %s %d. Say \"birthday forget\" if you change your mind.", from.Acct, month, day)
+	return b.replyf(ctx, mention, "@%s noted! I'll wish you a happy birthday every %s %d. Say \"birthday forget\" if you change your mind.", from.Acct, month, day)
 }
 
 func (b *Bot) celebrateBirthdays(ctx context.Context) {
@@ -146,7 +146,7 @@ func (b *Bot) celebrateBirthdays(ctx context.Context) {
 		accts = append(accts, leapAccts...)
 	}
 	for _, acct := range accts {
-		text := fmt.Sprintf("🎂 a little raccoon told me it's @%s's birthday today. Happy birthday! 🦝🎉", acct)
+		text := fmt.Sprintf("a little raccoon told me it's @%s's birthday today. Happy birthday!", acct)
 		if err := b.client.Post(ctx, "public", text); err != nil {
 			log.Printf("posting birthday wish for @%s: %v", acct, err)
 			return
@@ -226,7 +226,7 @@ func (b *Bot) remind(ctx context.Context, mention *Status) error {
 		return err
 	}
 	log.Printf("reminder set by @%s for %s", mention.Account.Acct, at.Format(time.RFC3339))
-	return b.replyf(ctx, mention, "@%s ⏰ got it, I'll nudge you here around %s UTC.", mention.Account.Acct, at.Format("Jan 2, 2006 15:04"))
+	return b.replyf(ctx, mention, "@%s got it, I'll nudge you here around %s UTC.", mention.Account.Acct, at.Format("Jan 2, 2006 15:04"))
 }
 
 func (b *Bot) deliverReminders(ctx context.Context) {
@@ -236,7 +236,7 @@ func (b *Bot) deliverReminders(ctx context.Context) {
 		return
 	}
 	for _, r := range due {
-		if err := b.replyf(ctx, &Status{ID: r.StatusID, Visibility: r.Visibility}, "@%s ⏰ you asked me to remind you about this. Here it is!", r.Acct); err != nil {
+		if err := b.replyf(ctx, &Status{ID: r.StatusID, Visibility: r.Visibility}, "@%s you asked me to remind you about this. Here it is!", r.Acct); err != nil {
 			log.Printf("delivering reminder %d to @%s: %v", r.ID, r.Acct, err)
 		}
 		if err := b.store.DeleteReminder(r.ID); err != nil {
@@ -336,10 +336,10 @@ func (b *Bot) maybePostMonthlyStats(ctx context.Context) {
 
 	var text string
 	if threads == 0 {
-		text = fmt.Sprintf("📊 monthly rummage report: a quiet %s — no new threads unrolled. %d unrolled all time.\n\nReply \"unroll\" to any post in a thread and I'll lay the whole thing out on a single page.",
+		text = fmt.Sprintf("monthly rummage report: a quiet %s, no new threads unrolled. %d unrolled all time.\n\nReply \"unroll\" to any post in a thread and I'll lay the whole thing out on a single page.",
 			prevStart.Format("January"), total)
 	} else {
-		text = fmt.Sprintf("📊 monthly rummage report: in %s I unrolled %d threads (%d posts dragged into the open). %d unrolled all time.\n\nReply \"unroll\" to any post in a thread and I'll lay the whole thing out on a single page.",
+		text = fmt.Sprintf("monthly rummage report: in %s I unrolled %d threads (%d posts dragged into the open). %d unrolled all time.\n\nReply \"unroll\" to any post in a thread and I'll lay the whole thing out on a single page.",
 			prevStart.Format("January"), threads, posts, total)
 	}
 	if err := b.client.Post(ctx, "public", text); err != nil {
@@ -359,33 +359,43 @@ func (b *Bot) handle(ctx context.Context, n Notification) {
 	if n.Status.Account.ID == b.me.ID {
 		return
 	}
-	if n.Status.Visibility == "direct" {
-		from := n.Status.Account
-		if hasWord(n.Status.Content, "birthday") {
-			if err := b.birthday(ctx, n.Status); err != nil {
-				log.Printf("birthday failed: %v", err)
-			}
+	if hasWord(n.Status.Content, "birthday") {
+		if err := b.birthday(ctx, n.Status); err != nil {
+			log.Printf("birthday failed: %v", err)
+		}
+		return
+	}
+	from := n.Status.Account
+	if hasPhrase(n.Status.Content, "forget", "me") {
+		log.Printf("opt-out requested by @%s", from.Acct)
+		if err := b.store.OptOut(from.ID, from.Acct); err != nil {
+			log.Printf("saving opt-out: %v", err)
 			return
 		}
-		if hasPhrase(n.Status.Content, "forget", "me") {
-			log.Printf("opt-out requested by @%s", from.Acct)
-			if err := b.store.OptOut(from.ID, from.Acct); err != nil {
-				log.Printf("saving opt-out: %v", err)
-				return
-			}
-			if err := b.store.ForgetPendingThreads(from.Acct); err != nil {
-				log.Printf("forgetting pending threads: %v", err)
-			}
-			b.replyf(ctx, n.Status, "@%s done. I've dropped what I'd gathered about your threads and won't unroll you on my own again. Message me \"remember me\" if you change your mind.", from.Acct)
+		if err := b.store.ForgetPendingThreads(from.Acct); err != nil {
+			log.Printf("forgetting pending threads: %v", err)
+		}
+		b.replyf(ctx, n.Status, "@%s done. I've dropped what I'd gathered about your threads and won't unroll you on my own again. Message me \"remember me\" if you change your mind.", from.Acct)
+		return
+	}
+	if hasPhrase(n.Status.Content, "remember", "me") {
+		log.Printf("opt-in requested by @%s", from.Acct)
+		if err := b.store.OptIn(from.ID); err != nil {
+			log.Printf("removing opt-out: %v", err)
 			return
 		}
-		if hasPhrase(n.Status.Content, "remember", "me") {
-			log.Printf("opt-in requested by @%s", from.Acct)
-			if err := b.store.OptIn(from.ID); err != nil {
-				log.Printf("removing opt-out: %v", err)
-				return
+		b.replyf(ctx, n.Status, "@%s welcome back! I'll happily unroll your threads again.", from.Acct)
+		return
+	}
+	if n.Status.InReplyToID != nil {
+		isPrompt, err := b.store.IsHelpPrompt(*n.Status.InReplyToID)
+		if err != nil {
+			log.Printf("checking help prompt: %v", err)
+		} else if isPrompt {
+			if err := b.store.DeleteHelpPrompt(*n.Status.InReplyToID); err != nil {
+				log.Printf("clearing help prompt: %v", err)
 			}
-			b.replyf(ctx, n.Status, "@%s welcome back! I'll happily unroll your threads again.", from.Acct)
+			b.helpSelection(ctx, n.Status)
 			return
 		}
 	}
@@ -415,20 +425,72 @@ func (b *Bot) handle(ctx context.Context, n Notification) {
 			b.replyf(ctx, n.Status, "@%s sorry, I couldn't set that reminder.", n.Status.Account.Acct)
 		}
 	case "help":
-		err = b.replyf(ctx, n.Status, "@%s here's what I can do:\n\n"+
-			"unroll — reply this to any thread post and I'll lay it out on one page\n"+
-			"refresh — thread authors can ask me to update the page\n"+
-			"remind — \"remind me in 3 days\" (or hours, weeks, \"tomorrow\")\n"+
-			"version — which version of me is running\n\n"+
-			"Mention me without a command and I'll boost the post. "+
-			"Private mentions: \"birthday June 12\" for yearly wishes (\"birthday forget\" drops it), "+
-			"\"forget me\" / \"remember me\" to opt out/in of auto-unrolls.",
-			n.Status.Account.Acct)
+		var prompt *Status
+		prompt, err = b.reply(ctx, n.Status, helpMenu, n.Status.Account.Acct)
+		if err == nil && prompt != nil {
+			if perr := b.store.AddHelpPrompt(prompt.ID); perr != nil {
+				log.Printf("recording help prompt: %v", perr)
+			}
+		}
 	case "version":
-		err = b.replyf(ctx, n.Status, "@%s I'm jacques v%s. 🦝", n.Status.Account.Acct, botVersion())
+		err = b.replyf(ctx, n.Status, "@%s I'm jacques v%s.", n.Status.Account.Acct, botVersion())
 	}
 	if err != nil {
 		log.Printf("%s failed: %v", cmd, err)
+	}
+}
+
+const helpMenu = "@%s here's what I can do. Reply to this with the name of one and I'll explain how it works:\n\n" +
+	"unroll, refresh, remind, birthday, forget, version\n\n" +
+	"(or mention me with no command on a public post and I'll boost it)"
+
+type helpTopic struct {
+	aliases     []string
+	explanation string
+}
+
+var helpTopics = []helpTopic{
+	{[]string{"unroll"}, "unroll: reply \"unroll\" to any post inside a thread and I'll lay the whole thing out on a single page you can link and share."},
+	{[]string{"refresh"}, "refresh: reply \"refresh\" on a thread that's already unrolled and I'll update its page with any new posts."},
+	{[]string{"remind", "reminder"}, "remind: say \"remind me in 3 days\" (also hours, weeks, or \"tomorrow\") and I'll nudge you right here when the time comes."},
+	{[]string{"birthday"}, "birthday: tell me \"birthday June 12\" and I'll wish you a happy birthday every year. Say \"birthday forget\" to drop it."},
+	{[]string{"forget", "remember", "optout"}, "forget me: message me \"forget me\" and I'll stop auto-unrolling your threads. Say \"remember me\" to opt back in."},
+	{[]string{"version"}, "version: reply \"version\" and I'll tell you which build of me is currently running."},
+	{[]string{"boost", "reblog"}, "boost: mention me with no command on a public post and I'll boost it for you."},
+}
+
+func matchHelpTopic(content string) *helpTopic {
+	fields := cleanFields(content)
+	for i := range helpTopics {
+		for _, alias := range helpTopics[i].aliases {
+			for _, f := range fields {
+				if f == alias {
+					return &helpTopics[i]
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (b *Bot) helpSelection(ctx context.Context, mention *Status) {
+	acct := mention.Account.Acct
+	topic := matchHelpTopic(mention.Content)
+	var reply *Status
+	var err error
+	if topic == nil {
+		reply, err = b.reply(ctx, mention, "@%s hmm, I don't know that one. Try: unroll, refresh, remind, birthday, forget, or version.", acct)
+	} else {
+		reply, err = b.reply(ctx, mention, "@%s %s", acct, topic.explanation)
+	}
+	if err != nil {
+		log.Printf("answering help selection from @%s: %v", acct, err)
+		return
+	}
+	if reply != nil {
+		if err := b.store.AddHelpPrompt(reply.ID); err != nil {
+			log.Printf("recording help prompt: %v", err)
+		}
 	}
 }
 
@@ -549,9 +611,6 @@ func (b *Bot) refresh(ctx context.Context, mention *Status) error {
 	if root == nil {
 		return b.replyf(ctx, mention, "@%s I couldn't find the thread this belongs to.", mention.Account.Acct)
 	}
-	if root.Account.ID != mention.Account.ID {
-		return b.replyf(ctx, mention, "@%s only the thread's author can ask me to refresh it.", mention.Account.Acct)
-	}
 	existing, err := b.store.GetUnroll(root.ID)
 	if err != nil {
 		return err
@@ -630,6 +689,11 @@ func (b *Bot) pageURL(rootID string) string {
 }
 
 func (b *Bot) replyf(ctx context.Context, to *Status, format string, args ...any) error {
+	_, err := b.reply(ctx, to, format, args...)
+	return err
+}
+
+func (b *Bot) reply(ctx context.Context, to *Status, format string, args ...any) (*Status, error) {
 	visibility := to.Visibility
 	if visibility == "" {
 		visibility = "direct"
@@ -638,5 +702,6 @@ func (b *Bot) replyf(ctx context.Context, to *Status, format string, args ...any
 }
 
 func (b *Bot) replyPublicf(ctx context.Context, to *Status, format string, args ...any) error {
-	return b.client.Reply(ctx, to, "public", fmt.Sprintf(format, args...))
+	_, err := b.client.Reply(ctx, to, "public", fmt.Sprintf(format, args...))
+	return err
 }

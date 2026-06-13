@@ -235,6 +235,26 @@ func TestParseCommand(t *testing.T) {
 	}
 }
 
+func TestMatchHelpTopic(t *testing.T) {
+	cases := map[string]string{
+		`<p><span class="h-card"><a href="https://example.com/@jacques">@jacques</a></span> unroll</p>`: "unroll: reply \"unroll\" to any post inside a thread and I'll lay the whole thing out on a single page you can link and share.",
+		`<p>@jacques Refresh!</p>`:     "refresh: reply \"refresh\" on a thread that's already unrolled and I'll update its page with any new posts.",
+		`<p>@jacques reminder</p>`:     "remind: say \"remind me in 3 days\" (also hours, weeks, or \"tomorrow\") and I'll nudge you right here when the time comes.",
+		`<p>@jacques remember</p>`:     "forget me: message me \"forget me\" and I'll stop auto-unrolling your threads. Say \"remember me\" to opt back in.",
+		`<p>@jacques what is this</p>`: "",
+	}
+	for content, want := range cases {
+		topic := matchHelpTopic(content)
+		got := ""
+		if topic != nil {
+			got = topic.explanation
+		}
+		if got != want {
+			t.Errorf("matchHelpTopic(%q) = %q, want %q", content, got, want)
+		}
+	}
+}
+
 func TestParseRemindDuration(t *testing.T) {
 	cases := map[string]struct {
 		d  time.Duration

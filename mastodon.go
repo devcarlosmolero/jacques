@@ -147,11 +147,15 @@ func (c *Client) Post(ctx context.Context, visibility, text string) error {
 	return c.do(ctx, http.MethodPost, "/api/v1/statuses", nil, form, nil)
 }
 
-func (c *Client) Reply(ctx context.Context, to *Status, visibility, text string) error {
+func (c *Client) Reply(ctx context.Context, to *Status, visibility, text string) (*Status, error) {
 	form := url.Values{
 		"status":         {text},
 		"in_reply_to_id": {to.ID},
 		"visibility":     {visibility},
 	}
-	return c.do(ctx, http.MethodPost, "/api/v1/statuses", nil, form, nil)
+	var s Status
+	if err := c.do(ctx, http.MethodPost, "/api/v1/statuses", nil, form, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }

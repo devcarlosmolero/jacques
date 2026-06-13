@@ -20,7 +20,7 @@ Jacques always matches how you talked to him: ask publicly and he answers public
 
 ### refresh
 
-Added more posts to a thread after it was unrolled? Reply `@jacques refresh` anywhere in the thread and he'll re-read it and update the page in place. Same URL, so links that are already out there keep working. Only the thread's author can refresh.
+Added more posts to a thread after it was unrolled? Reply `@jacques refresh` anywhere in the thread and he'll re-read it and update the page in place. Same URL, so links that are already out there keep working. Anyone can ask for a refresh, not just the author.
 
 ### remind
 
@@ -28,7 +28,7 @@ Reply `@jacques remind me in 3 days` to any post and he'll come back and nudge y
 
 ### birthday
 
-Send jacques a private mention saying `birthday June 12` (or `birthday 12 June`, month names can be abbreviated to three letters) and every year on that day he'll post a public birthday wish for you. Born on February 29? He celebrates on the 28th when the year is short a day. Say `birthday forget` and he drops the date entirely.
+Mention jacques saying `birthday June 12` (or `birthday 12 June`, month names can be abbreviated to three letters) and every year on that day he'll post a public birthday wish for you. Born on February 29? He celebrates on the 28th when the year is short a day. Say `birthday forget` and he drops the date entirely.
 
 ### boost
 
@@ -36,13 +36,13 @@ Mention `@jacques` in any public or unlisted post, no command needed, and he'll 
 
 ### help & version
 
-A mention containing `help` gets you a rundown of everything above; `version` tells you which build of jacques is running.
+A mention containing `help` is interactive: jacques lists what he can do and invites you to reply with the name of one (unroll, refresh, remind, birthday, forget, version) so he can explain how that one works. Reply again to ask about another. `version` tells you which build of jacques is running.
 
 ### auto-unroll
 
 Jacques also rummages on his own. He watches the federated timeline for authors replying to themselves, and when a self-thread reaches 5 posts and has been quiet for 15 minutes, he unrolls it and replies publicly with the link. One reply per thread, ever; at most 4 per hour; bots and conversations that merely contain self-replies are left alone. These announcements, the monthly report and birthday wishes are the only things jacques posts publicly on his own initiative; everything else follows the visibility of whoever talked to him.
 
-Don't want him around? Put `#nobot` in your bio, or send him a private mention saying `forget me` and he'll drop what he'd gathered about your threads and never unroll you on his own again (`remember me` undoes it). Everything is tunable or can be switched off via the `JACQUES_AUTO_UNROLL*` environment variables in `main.go`.
+Don't want him around? Put `#nobot` in your bio, or mention him saying `forget me` and he'll drop what he'd gathered about your threads and never unroll you on his own again (`remember me` undoes it). Everything is tunable or can be switched off via the `JACQUES_AUTO_UNROLL*` environment variables in `main.go`.
 
 ### monthly rummage report
 

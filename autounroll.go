@@ -162,7 +162,7 @@ func (b *Bot) announce(ctx context.Context, t AutoThread) error {
 	last := chain[len(chain)-1]
 	log.Printf("auto-unrolled thread %s by @%s (%d posts)", root.ID, root.Account.Acct, len(chain))
 	return b.replyPublicf(ctx, &last,
-		"@%s I unrolled this thread (%d posts) into a single page for easier reading: %s\n\nI'm a bot. Reply \"unroll\" to any thread and I'll do the same; add #nobot to your bio or send me a private mention saying \"forget me\" and I'll leave you alone.",
+		"@%s I unrolled this thread (%d posts) into a single page for easier reading: %s\n\nI'm a bot. Reply \"unroll\" to any thread and I'll do the same; add #nobot to your bio or mention me saying \"forget me\" and I'll leave you alone.",
 		root.Account.Acct, len(chain), b.pageURL(root.ID))
 }
 
